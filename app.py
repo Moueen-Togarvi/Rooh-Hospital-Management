@@ -70,32 +70,33 @@ def get_db():
             print("Creating new MongoDB connection...")
             print(f"Python SSL version: {ssl.OPENSSL_VERSION}")
             
-            # Optimized connection for Render
+            # Robust connection for Atlas/Render
             mongo_client = MongoClient(
                 mongo_uri,
-                serverSelectionTimeoutMS=10000,  # Reduced for faster failure
-                connectTimeoutMS=10000,
-                socketTimeoutMS=45000,
-                maxPoolSize=10,  # Increased for better performance
-                minPoolSize=1,
+                tlsCAFile=certifi.where(),
+                # Essential for Atlas SRV connections in some environments
+                tls=True,
+                # Timeouts
+                serverSelectionTimeoutMS=30000, 
+                connectTimeoutMS=20000,
+                # Pool settings
+                maxPoolSize=50,
                 retryWrites=True,
-                retryReads=True,
-                w='majority',
-
-                directConnection=False,
-                tlsCAFile=certifi.where()
+                w='majority'
             )
-            # Test the connection with timeout
-            mongo_client.admin.command('ping', maxTimeMS=5000)
-            # Extract database name from URI or use default
-            db_name = mongo_uri.split('/')[-1].split('?')[0] or 'RoohPMS'
+            # Test the connection
+            mongo_client.admin.command('ping')
+            
+            # Extract database name from URI
+            # Typical URI: mongodb+srv://user:pass@host/dbname?options
+            path_part = mongo_uri.split('/')[-1].split('?')[0]
+            db_name = path_part or 'RoohPMS'
+            
             db = mongo_client[db_name]
             print(f"MongoDB connected to database: {db_name}")
             return db
         except Exception as e:
-            print(f"MongoDB connection error: {type(e).__name__}: {e}")
-            import traceback
-            traceback.print_exc()
+            print(f"CRITICAL: MongoDB connection error: {e}")
             return None
     else:
         print("MONGO_URI not set")
